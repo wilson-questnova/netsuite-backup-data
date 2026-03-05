@@ -7,7 +7,9 @@
     "start:server": "ts-node src/server.ts",
     "etl:po": "ts-node src/process_po.ts",
     "init:db": "ts-node src/db.ts",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "build": "tsc && cd client && npm install && npm run build",
+    "start": "node dist/server.js"
   },
   "keywords": [],
   "author": "",

@@ -183,6 +183,9 @@ if (process.env.NODE_ENV === 'production') {
   app.use(express.static(clientBuildPath));
   
   app.get('*', (req, res) => {
+    if (req.path.startsWith('/api')) {
+      return res.status(404).json({ error: 'Not Found' });
+    }
     res.sendFile(path.join(clientBuildPath, 'index.html'));
   });
 }
