@@ -20,6 +20,10 @@ interface Meta {
   totalPages: number;
 }
 
+const API_BASE_URL =
+  import.meta.env.VITE_API_BASE_URL || (import.meta.env.DEV ? 'http://localhost:3001' : '');
+const api = axios.create({ baseURL: API_BASE_URL });
+
 function App() {
   const [data, setData] = useState<PurchaseOrder[]>([]);
   const [meta, setMeta] = useState<Meta>({ total: 0, page: 1, limit: 50, totalPages: 0 });
@@ -99,7 +103,7 @@ function App() {
     setLoginError(null);
     const header = 'Basic ' + btoa(`${username}:${password}`);
     try {
-      await axios.get('http://localhost:3001/api/auth/me', {
+      await api.get('/api/auth/me', {
         headers: { Authorization: header },
       });
       sessionStorage.setItem('basic_user', username);
@@ -119,7 +123,7 @@ function App() {
   const fetchData = async (pageNum: number, searchQuery: string, start: string, end: string, statusFilter: string) => {
     setLoading(true);
     try {
-      const response = await axios.get('http://localhost:3001/api/purchase-orders', {
+      const response = await api.get('/api/purchase-orders', {
         headers: authHeader ? { Authorization: authHeader } : undefined,
         params: {
           page: pageNum,
@@ -162,8 +166,8 @@ function App() {
 
   useEffect(() => {
     if (!auth) return;
-    axios
-      .get('http://localhost:3001/api/purchase-orders-statuses', {
+    api
+      .get('/api/purchase-orders-statuses', {
         headers: authHeader ? { Authorization: authHeader } : undefined,
       })
       .then((res) => setStatuses(res.data.statuses || []))
@@ -221,7 +225,7 @@ function App() {
     setDetailOpen(true);
     setDetailLoading(true);
     try {
-      const res = await axios.get(`http://localhost:3001/api/purchase-orders/${encodeURIComponent(docNumber)}`, {
+      const res = await api.get(`/api/purchase-orders/${encodeURIComponent(docNumber)}`, {
         headers: authHeader ? { Authorization: authHeader } : undefined,
       });
       setDetail(res.data);
