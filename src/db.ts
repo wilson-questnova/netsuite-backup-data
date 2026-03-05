@@ -3,8 +3,11 @@ import { open, Database } from 'sqlite';
 import path from 'path';
 import fs from 'fs';
 
-const dbPath = path.resolve(__dirname, '../data/netsuite.db');
-export const dbFilePath = dbPath;
+const envPath = process.env.NETSUITE_DB_PATH && process.env.NETSUITE_DB_PATH.trim()
+  ? process.env.NETSUITE_DB_PATH.trim()
+  : null;
+const resolvedDbPath = envPath ? path.resolve(envPath) : path.resolve(__dirname, '../data/netsuite.db');
+export const dbFilePath = resolvedDbPath;
 
 let dbInstance: Database | null = null;
 
@@ -35,11 +38,11 @@ async function ensureSchema(db: Database) {
 
 export async function getDb() {
   if (dbInstance) return dbInstance;
-  await fs.promises.mkdir(path.dirname(dbPath), { recursive: true });
+  await fs.promises.mkdir(path.dirname(dbFilePath), { recursive: true });
   
   const openDb = (mode: number) =>
     open({
-      filename: dbPath,
+      filename: dbFilePath,
       driver: sqlite3.Database,
       mode,
     });
@@ -69,7 +72,7 @@ export async function initDb() {
   const db = await getDb();
 
   await ensureSchema(db);
-  console.log('Database initialized at:', dbPath);
+  console.log('Database initialized at:', dbFilePath);
 }
 
 // Run init if called directly
