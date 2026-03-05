@@ -7,6 +7,8 @@
     "start:server": "ts-node src/server.ts",
     "etl:po": "ts-node src/process_po.ts",
     "etl:po:prod": "node dist/process_po.js",
+    "etl:vp": "ts-node src/process_vendor_payments.ts",
+    "etl:vp:prod": "node dist/process_vendor_payments.js",
     "init:db": "ts-node src/db.ts",
     "db:export": "ts-node src/export_db.ts",
     "test": "echo \"Error: no test specified\" && exit 1",
