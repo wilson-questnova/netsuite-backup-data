@@ -137,8 +137,8 @@ app.get('/api/purchase-orders', async (req, res) => {
     // For main query, we need limit/offset params
     const queryParams = [...params, limit, offset];
 
-    const totalResult = await db.get(countQuery, params) as { total: number };
-    const rows = await db.all(query, queryParams);
+    const totalResult = await db.get(countQuery, ...params) as { total: number };
+    const rows = await db.all(query, ...queryParams);
 
     res.json({
       data: rows,
