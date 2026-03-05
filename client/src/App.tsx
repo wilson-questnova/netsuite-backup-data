@@ -34,6 +34,7 @@ function App() {
   const [status, setStatus] = useState('');
   const [statuses, setStatuses] = useState<string[]>([]);
   const [page, setPage] = useState(1);
+  const [recordType, setRecordType] = useState<'PO' | 'VP'>('PO');
   const [detailOpen, setDetailOpen] = useState(false);
   const [detailLoading, setDetailLoading] = useState(false);
   const [detail, setDetail] = useState<null | {
@@ -123,7 +124,8 @@ function App() {
   const fetchData = async (pageNum: number, searchQuery: string, start: string, end: string, statusFilter: string) => {
     setLoading(true);
     try {
-      const response = await api.get('/api/purchase-orders', {
+      const path = recordType === 'PO' ? '/api/purchase-orders' : '/api/vendor-payments';
+      const response = await api.get(path, {
         headers: authHeader ? { Authorization: authHeader } : undefined,
         params: {
           page: pageNum,
@@ -156,7 +158,7 @@ function App() {
       fetchData(1, search, startDate, endDate, status);
     }, 500);
     return () => clearTimeout(timer);
-  }, [auth, search, startDate, endDate, status]);
+  }, [auth, search, startDate, endDate, status, recordType]);
 
   // Handle page change
   useEffect(() => {
@@ -166,8 +168,9 @@ function App() {
 
   useEffect(() => {
     if (!auth) return;
+    const statusesPath = recordType === 'PO' ? '/api/purchase-orders-statuses' : '/api/vendor-payments-statuses';
     api
-      .get('/api/purchase-orders-statuses', {
+      .get(statusesPath, {
         headers: authHeader ? { Authorization: authHeader } : undefined,
       })
       .then((res) => setStatuses(res.data.statuses || []))
@@ -179,7 +182,7 @@ function App() {
         }
         console.error('Failed to load statuses', err);
       });
-  }, [auth, authHeader]);
+  }, [auth, authHeader, recordType]);
 
   useEffect(() => {
     if (!detailOpen) return;
@@ -237,7 +240,11 @@ function App() {
     setDetailOpen(true);
     setDetailLoading(true);
     try {
-      const res = await api.get(`/api/purchase-orders/${encodeURIComponent(docNumber)}`, {
+      const detailPath =
+        recordType === 'PO'
+          ? `/api/purchase-orders/${encodeURIComponent(docNumber)}`
+          : `/api/vendor-payments/${encodeURIComponent(docNumber)}`;
+      const res = await api.get(detailPath, {
         headers: authHeader ? { Authorization: authHeader } : undefined,
       });
       setDetail(res.data);
@@ -254,7 +261,9 @@ function App() {
         
         {/* Header */}
         <div className="flex justify-between items-center">
-          <h1 className="text-3xl font-bold text-gray-900">Purchase Orders Viewer</h1>
+          <h1 className="text-3xl font-bold text-gray-900">
+            {recordType === 'PO' ? 'Purchase Orders Viewer' : 'Vendor Payments Viewer'}
+          </h1>
           <div className="flex items-center space-x-4">
             <div className="text-sm text-gray-500">
               Total Records: <span className="font-semibold">{meta.total.toLocaleString()}</span>
@@ -270,6 +279,18 @@ function App() {
 
         {/* Search & Filters */}
         <div className="bg-white p-4 rounded-lg shadow space-y-4 sm:space-y-0 sm:flex sm:items-center sm:space-x-4">
+          <div>
+            <label htmlFor="recordType" className="sr-only">Record Type</label>
+            <select
+              id="recordType"
+              className="block w-full pl-3 pr-8 py-2 border border-gray-300 rounded-md leading-5 bg-white text-gray-700 focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+              value={recordType}
+              onChange={(e) => { setRecordType(e.target.value as 'PO' | 'VP'); setPage(1); }}
+            >
+              <option value="PO">Purchase Orders</option>
+              <option value="VP">Vendor Payments</option>
+            </select>
+          </div>
           <div className="relative flex-1">
             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
               <Search className="h-5 w-5 text-gray-400" />
@@ -277,7 +298,7 @@ function App() {
             <input
               type="text"
               className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md leading-5 bg-white placeholder-gray-500 focus:outline-none focus:placeholder-gray-400 focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-              placeholder="Search by Document Number, Supplier, or Item..."
+              placeholder={recordType === 'PO' ? 'Search by Document Number, Supplier, or Item...' : 'Search by Document Number, Vendor, or Item...'}
               value={search}
               onChange={(e) => setSearch(e.target.value)}
             />
@@ -330,9 +351,11 @@ function App() {
                 <tr>
                   <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
                   <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Doc Num</th>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Supplier</th>
+                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{recordType === 'PO' ? 'Supplier' : 'Vendor'}</th>
                   <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Item</th>
-                  <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Qty</th>
+                  {recordType === 'PO' && (
+                    <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Qty</th>
+                  )}
                   <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Amount</th>
                   <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
                 </tr>
@@ -366,8 +389,10 @@ function App() {
                         </button>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 max-w-[200px] truncate" title={row.entity_name}>{row.entity_name}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 max-w-xs truncate" title={row.item_name}>{row.item_name}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-right">{row.quantity}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 max-w-xs truncate" title={row.item_name}>{row.item_name}</td>
+                      {recordType === 'PO' && (
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-right">{row.quantity}</td>
+                      )}
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right font-mono">
                         {new Intl.NumberFormat('en-PH', { style: 'currency', currency: 'PHP' }).format(row.amount)}
                       </td>
@@ -443,7 +468,7 @@ function App() {
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between border-b px-6 py-4 shrink-0">
-              <h2 className="text-lg font-semibold text-gray-900">Purchase Order Details</h2>
+              <h2 className="text-lg font-semibold text-gray-900">{recordType === 'PO' ? 'Purchase Order Details' : 'Vendor Payment Details'}</h2>
               <button className="text-gray-500 hover:text-gray-700" onClick={() => { setDetailOpen(false); setDetail(null); }}>
                 Close
               </button>
@@ -458,7 +483,7 @@ function App() {
                   <div className="grid grid-cols-2 gap-4 mb-4 text-sm">
                     <div><span className="text-gray-500">Doc Num:</span> <span className="font-medium">{detail.header.document_number}</span></div>
                     <div><span className="text-gray-500">Date:</span> <span className="font-medium">{detail.header.transaction_date}</span></div>
-                    <div><span className="text-gray-500">Supplier:</span> <span className="font-medium">{detail.header.entity_name}</span></div>
+                    <div><span className="text-gray-500">{recordType === 'PO' ? 'Supplier:' : 'Vendor:'}</span> <span className="font-medium">{detail.header.entity_name}</span></div>
                     <div><span className="text-gray-500">Status:</span> <span className="font-medium">{detail.header.status}</span></div>
                     {detail.header.location ? (
                       <div className="col-span-2"><span className="text-gray-500">Location:</span> <span className="font-medium">{detail.header.location}</span></div>

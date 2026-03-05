@@ -260,6 +260,186 @@ app.get('/api/purchase-orders/:docNumber', async (req, res) => {
   }
 });
 
+// Vendor Payments APIs
+app.get('/api/vendor-payments', async (req, res) => {
+  try {
+    const db = await getDb();
+    const page = parseInt(req.query.page as string) || 1;
+    const limit = parseInt(req.query.limit as string) || 50;
+    const search = (req.query.search as string || '').trim();
+    const startDate = (req.query.startDate as string || '').trim();
+    const endDate = (req.query.endDate as string || '').trim();
+    const status = (req.query.status as string || '').trim();
+    const offset = (page - 1) * limit;
+
+    let query = `
+      SELECT internal_id, transaction_date, entity_name, document_number, 
+             status, item_name, quantity, amount 
+      FROM vendor_payments
+      WHERE 1=1
+    `;
+    
+    let countQuery = `SELECT COUNT(*) as total FROM vendor_payments WHERE 1=1`;
+    const params: any[] = [];
+
+    if (search) {
+      const searchCondition = `
+        AND (
+          document_number LIKE ? 
+          OR entity_name LIKE ? 
+          OR item_name LIKE ?
+          OR internal_id LIKE ?
+        )
+      `;
+      query += searchCondition;
+      countQuery += searchCondition;
+      const searchParam = `%${search}%`;
+      params.push(searchParam, searchParam, searchParam, searchParam);
+    }
+
+    if (startDate) {
+      const dateCondition = ` AND transaction_date >= ?`;
+      query += dateCondition;
+      countQuery += dateCondition;
+      params.push(startDate);
+    }
+
+    if (endDate) {
+      const dateCondition = ` AND transaction_date <= ?`;
+      query += dateCondition;
+      countQuery += dateCondition;
+      params.push(endDate);
+    }
+
+    if (status) {
+      const statusCondition = ` AND status = ?`;
+      query += statusCondition;
+      countQuery += statusCondition;
+      params.push(status);
+    }
+
+    query += ` ORDER BY transaction_date DESC LIMIT ? OFFSET ?`;
+    const queryParams = [...params, limit, offset];
+
+    const totalResult = await db.get(countQuery, ...params) as { total: number };
+    const rows = await db.all(query, ...queryParams);
+
+    res.json({
+      data: rows,
+      meta: {
+        total: totalResult.total,
+        page,
+        limit,
+        totalPages: Math.ceil(totalResult.total / limit)
+      }
+    });
+  } catch (error) {
+    console.error('Vendor payments search error:', error);
+    res.status(500).json({ error: 'Database error' });
+  }
+});
+
+app.get('/api/vendor-payments-statuses', async (req, res) => {
+  try {
+    const db = await getDb();
+    const rows = await db.all(`
+      SELECT DISTINCT status
+      FROM vendor_payments
+      WHERE status IS NOT NULL AND status != ''
+      ORDER BY status ASC
+    `) as { status: string }[];
+    res.json({ statuses: rows.map(r => r.status) });
+  } catch (e) {
+    console.error('Vendor payment statuses error:', e);
+    res.status(500).json({ error: 'Database error' });
+  }
+});
+
+app.get('/api/vendor-payments/:docNumber', async (req, res) => {
+  const docNumber = (req.params.docNumber || '').trim();
+  if (!docNumber) {
+    return res.status(400).json({ error: 'Missing document number' });
+  }
+  try {
+    const db = await getDb();
+    const headerRow = await db.get(`
+      SELECT internal_id, transaction_date, entity_name, document_number, status, raw_data
+      FROM vendor_payments
+      WHERE document_number = ?
+      ORDER BY rowid ASC
+      LIMIT 1
+    `, docNumber) as any;
+
+    const rawHeader = (() => {
+      try { return headerRow?.raw_data ? JSON.parse(headerRow.raw_data) : null; } catch { return null; }
+    })();
+    const location =
+      rawHeader?.['Location'] ??
+      rawHeader?.['location'] ??
+      rawHeader?.['Location Name'] ??
+      null;
+
+    const header = headerRow
+      ? {
+          internal_id: headerRow.internal_id,
+          transaction_date: headerRow.transaction_date,
+          entity_name: headerRow.entity_name,
+          document_number: headerRow.document_number,
+          status: headerRow.status,
+          location,
+        }
+      : null;
+
+    if (!header) {
+      return res.status(404).json({ error: 'Document not found' });
+    }
+
+    const rows = await db.all(`
+      SELECT item_name AS item, quantity, amount, raw_data
+      FROM vendor_payments
+      WHERE document_number = ? AND (item_name IS NOT NULL AND item_name != '' OR raw_data IS NOT NULL)
+      ORDER BY rowid ASC
+    `, docNumber) as any[];
+
+    const parseNumber = (v: any): number => {
+      if (v === null || v === undefined) return 0;
+      if (typeof v === 'number') return isFinite(v) ? v : 0;
+      const s = String(v).replace(/[₱,\s]/g, '');
+      const n = parseFloat(s);
+      return isFinite(n) ? n : 0;
+    };
+
+    const lines = rows.map(r => {
+      let raw: any = null;
+      try { raw = r.raw_data ? JSON.parse(r.raw_data) : null; } catch { raw = null; }
+      const item = r.item ?? raw?.['Applied To'] ?? raw?.['Memo'] ?? raw?.['Account'] ?? '';
+      const rate = raw ? (raw['Item Rate'] ?? raw['Rate'] ?? null) : null;
+      const discount = raw ? (raw['Discount'] ?? raw['Item Discount'] ?? null) : null;
+      return {
+        item,
+        quantity: r.quantity,
+        amount: parseNumber(r.amount),
+        rate: parseNumber(rate),
+        srp: 0,
+        discount: discount ?? '',
+      };
+    });
+
+    const totals = await db.get(`
+      SELECT 
+        SUM(COALESCE(quantity,0)) AS total_qty,
+        SUM(COALESCE(amount,0))   AS total_amount
+      FROM vendor_payments
+      WHERE document_number = ?
+    `, docNumber);
+
+    res.json({ header, lines, totals });
+  } catch (e) {
+    console.error('Vendor payment detail error:', e);
+    res.status(500).json({ error: 'Database error' });
+  }
+});
+
 // Serve static files from the React app (in production)
 // For dev, we run Vite separately.
 if (process.env.NODE_ENV === 'production') {
