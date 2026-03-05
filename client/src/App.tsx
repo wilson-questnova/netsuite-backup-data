@@ -181,6 +181,18 @@ function App() {
       });
   }, [auth, authHeader]);
 
+  useEffect(() => {
+    if (!detailOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setDetailOpen(false);
+        setDetail(null);
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [detailOpen]);
+
   if (!auth) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50 p-6">
@@ -235,18 +247,6 @@ function App() {
       setDetailLoading(false);
     }
   };
-
-  useEffect(() => {
-    if (!detailOpen) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        setDetailOpen(false);
-        setDetail(null);
-      }
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [detailOpen]);
 
   return (
     <div className="min-h-screen bg-gray-50 p-8">
