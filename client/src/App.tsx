@@ -37,8 +37,8 @@ function App() {
   const [detailOpen, setDetailOpen] = useState(false);
   const [detailLoading, setDetailLoading] = useState(false);
   const [detail, setDetail] = useState<null | {
-    header: { internal_id: string; transaction_date: string; entity_name: string; document_number: string; status: string };
-    lines: { item: string; quantity: number; amount: number }[];
+    header: { internal_id: string; transaction_date: string; entity_name: string; document_number: string; status: string; location?: string | null };
+    lines: { item: string; quantity: number; rate?: number; srp?: number; discount?: string; amount: number }[];
     totals: { total_qty: number; total_amount: number };
   }>(null);
   const [auth, setAuth] = useState<{ user: string; pass: string } | null>(null);
@@ -460,12 +460,18 @@ function App() {
                     <div><span className="text-gray-500">Date:</span> <span className="font-medium">{detail.header.transaction_date}</span></div>
                     <div><span className="text-gray-500">Supplier:</span> <span className="font-medium">{detail.header.entity_name}</span></div>
                     <div><span className="text-gray-500">Status:</span> <span className="font-medium">{detail.header.status}</span></div>
+                    {detail.header.location ? (
+                      <div className="col-span-2"><span className="text-gray-500">Location:</span> <span className="font-medium">{detail.header.location}</span></div>
+                    ) : null}
                   </div>
                   <div className="border rounded">
                     <table className="min-w-full divide-y divide-gray-200">
                       <thead className="bg-gray-50">
                         <tr>
                           <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Item</th>
+                          <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Rate</th>
+                          <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">SRP</th>
+                          <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Discount</th>
                           <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Qty</th>
                           <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Amount</th>
                         </tr>
@@ -474,6 +480,13 @@ function App() {
                         {detail.lines.map((ln, i) => (
                           <tr key={i} className="hover:bg-gray-50">
                             <td className="px-4 py-2 text-sm text-gray-900">{ln.item}</td>
+                            <td className="px-4 py-2 text-sm text-gray-900 text-right font-mono">
+                              {new Intl.NumberFormat('en-PH', { style: 'currency', currency: 'PHP' }).format(ln.rate ?? 0)}
+                            </td>
+                            <td className="px-4 py-2 text-sm text-gray-900 text-right font-mono">
+                              {new Intl.NumberFormat('en-PH', { style: 'currency', currency: 'PHP' }).format(Number(ln.srp ?? 0) || 0)}
+                            </td>
+                            <td className="px-4 py-2 text-sm text-gray-500 text-right">{ln.discount ?? ''}</td>
                             <td className="px-4 py-2 text-sm text-gray-500 text-right">{ln.quantity}</td>
                             <td className="px-4 py-2 text-sm text-gray-900 text-right font-mono">
                               {new Intl.NumberFormat('en-PH', { style: 'currency', currency: 'PHP' }).format(ln.amount || 0)}

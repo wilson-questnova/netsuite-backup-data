@@ -180,24 +180,69 @@ app.get('/api/purchase-orders/:docNumber', async (req, res) => {
 
   try {
     const db = await getDb();
-    const header = await db.get(`
-      SELECT internal_id, transaction_date, entity_name, document_number, status
+    const headerRow = await db.get(`
+      SELECT internal_id, transaction_date, entity_name, document_number, status, raw_data
       FROM purchase_orders
       WHERE document_number = ?
-      ORDER BY transaction_date DESC
+      ORDER BY rowid ASC
       LIMIT 1
-    `, docNumber);
+    `, docNumber) as any;
+
+    const rawHeader = (() => {
+      try { return headerRow?.raw_data ? JSON.parse(headerRow.raw_data) : null; } catch { return null; }
+    })();
+
+    const location =
+      rawHeader?.['Location'] ??
+      rawHeader?.['location'] ??
+      rawHeader?.['Location Name'] ??
+      null;
+
+    const header = headerRow
+      ? {
+          internal_id: headerRow.internal_id,
+          transaction_date: headerRow.transaction_date,
+          entity_name: headerRow.entity_name,
+          document_number: headerRow.document_number,
+          status: headerRow.status,
+          location,
+        }
+      : null;
 
     if (!header) {
       return res.status(404).json({ error: 'Document not found' });
     }
 
-    const lines = await db.all(`
-      SELECT item_name AS item, quantity, amount
+    const rows = await db.all(`
+      SELECT item_name AS item, quantity, amount, raw_data
       FROM purchase_orders
       WHERE document_number = ? AND item_name IS NOT NULL AND item_name != ''
       ORDER BY rowid ASC
-    `, docNumber);
+    `, docNumber) as any[];
+
+    const parseNumber = (v: any): number => {
+      if (v === null || v === undefined) return 0;
+      if (typeof v === 'number') return isFinite(v) ? v : 0;
+      const s = String(v).replace(/[₱,\s]/g, '');
+      const n = parseFloat(s);
+      return isFinite(n) ? n : 0;
+    };
+
+    const lines = rows.map(r => {
+      let raw: any = null;
+      try { raw = r.raw_data ? JSON.parse(r.raw_data) : null; } catch { raw = null; }
+      const rate = raw ? (raw['Item Rate'] ?? raw['Rate'] ?? null) : null;
+      const srp = raw ? (raw['SRP'] ?? raw['Suggested Retail Price'] ?? null) : null;
+      const discount = raw ? (raw['Discount'] ?? raw['Item Discount'] ?? null) : null;
+      return {
+        item: r.item,
+        quantity: r.quantity,
+        amount: parseNumber(r.amount),
+        rate: parseNumber(rate),
+        srp: parseNumber(srp), // if NaN, becomes 0
+        discount: discount ?? '',
+      };
+    });
 
     const totals = await db.get(`
       SELECT 
