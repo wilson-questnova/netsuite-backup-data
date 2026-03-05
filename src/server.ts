@@ -38,68 +38,71 @@ app.get('/api/auth/me', (req, res) => {
 });
 
 // API Routes
-app.get('/api/purchase-orders', (req, res) => {
-  const db = getDb();
-  const page = parseInt(req.query.page as string) || 1;
-  const limit = parseInt(req.query.limit as string) || 50;
-  const search = (req.query.search as string || '').trim();
-  const startDate = (req.query.startDate as string || '').trim();
-  const endDate = (req.query.endDate as string || '').trim();
-  const status = (req.query.status as string || '').trim();
-  const offset = (page - 1) * limit;
-
-  let query = `
-    SELECT internal_id, transaction_date, entity_name, document_number, 
-           status, item_name, quantity, amount 
-    FROM purchase_orders
-    WHERE 1=1
-  `;
-  
-  let countQuery = `SELECT COUNT(*) as total FROM purchase_orders WHERE 1=1`;
-  const params: any[] = [];
-
-  if (search) {
-    const searchCondition = `
-      AND (
-        document_number LIKE ? 
-        OR entity_name LIKE ? 
-        OR item_name LIKE ?
-        OR internal_id LIKE ?
-      )
-    `;
-    query += searchCondition;
-    countQuery += searchCondition;
-    const searchParam = `%${search}%`;
-    params.push(searchParam, searchParam, searchParam, searchParam);
-  }
-
-  if (startDate) {
-    const dateCondition = ` AND transaction_date >= ?`;
-    query += dateCondition;
-    countQuery += dateCondition;
-    params.push(startDate);
-  }
-
-  if (endDate) {
-    const dateCondition = ` AND transaction_date <= ?`;
-    query += dateCondition;
-    countQuery += dateCondition;
-    params.push(endDate);
-  }
-
-  if (status) {
-    const statusCondition = ` AND status = ?`;
-    query += statusCondition;
-    countQuery += statusCondition;
-    params.push(status);
-  }
-
-  // Order by date desc
-  query += ` ORDER BY transaction_date DESC LIMIT ? OFFSET ?`;
-  
+app.get('/api/purchase-orders', async (req, res) => {
   try {
-    const totalResult = db.prepare(countQuery).get(...params) as { total: number };
-    const rows = db.prepare(query).all(...params, limit, offset);
+    const db = await getDb();
+    const page = parseInt(req.query.page as string) || 1;
+    const limit = parseInt(req.query.limit as string) || 50;
+    const search = (req.query.search as string || '').trim();
+    const startDate = (req.query.startDate as string || '').trim();
+    const endDate = (req.query.endDate as string || '').trim();
+    const status = (req.query.status as string || '').trim();
+    const offset = (page - 1) * limit;
+
+    let query = `
+      SELECT internal_id, transaction_date, entity_name, document_number, 
+             status, item_name, quantity, amount 
+      FROM purchase_orders
+      WHERE 1=1
+    `;
+    
+    let countQuery = `SELECT COUNT(*) as total FROM purchase_orders WHERE 1=1`;
+    const params: any[] = [];
+
+    if (search) {
+      const searchCondition = `
+        AND (
+          document_number LIKE ? 
+          OR entity_name LIKE ? 
+          OR item_name LIKE ?
+          OR internal_id LIKE ?
+        )
+      `;
+      query += searchCondition;
+      countQuery += searchCondition;
+      const searchParam = `%${search}%`;
+      params.push(searchParam, searchParam, searchParam, searchParam);
+    }
+
+    if (startDate) {
+      const dateCondition = ` AND transaction_date >= ?`;
+      query += dateCondition;
+      countQuery += dateCondition;
+      params.push(startDate);
+    }
+
+    if (endDate) {
+      const dateCondition = ` AND transaction_date <= ?`;
+      query += dateCondition;
+      countQuery += dateCondition;
+      params.push(endDate);
+    }
+
+    if (status) {
+      const statusCondition = ` AND status = ?`;
+      query += statusCondition;
+      countQuery += statusCondition;
+      params.push(status);
+    }
+
+    // Order by date desc
+    query += ` ORDER BY transaction_date DESC LIMIT ? OFFSET ?`;
+    
+    // For main query, we need limit/offset params
+    const queryParams = [...params, limit, offset];
+
+    const totalResult = await db.get(countQuery, params) as { total: number };
+    const rows = await db.all(query, queryParams);
 
     res.json({
       data: rows,
@@ -116,15 +119,15 @@ app.get('/api/purchase-orders', (req, res) => {
   }
 });
 
-app.get('/api/purchase-orders-statuses', (req, res) => {
-  const db = getDb();
+app.get('/api/purchase-orders-statuses', async (req, res) => {
   try {
-    const rows = db.prepare(`
+    const db = await getDb();
+    const rows = await db.all(`
       SELECT DISTINCT status
       FROM purchase_orders
       WHERE status IS NOT NULL AND status != ''
       ORDER BY status ASC
-    `).all() as { status: string }[];
+    `) as { status: string }[];
     res.json({ statuses: rows.map(r => r.status) });
   } catch (e) {
     console.error('Statuses error:', e);
@@ -133,41 +136,41 @@ app.get('/api/purchase-orders-statuses', (req, res) => {
 });
 
 // Detail view for a specific Document Number
-app.get('/api/purchase-orders/:docNumber', (req, res) => {
-  const db = getDb();
+app.get('/api/purchase-orders/:docNumber', async (req, res) => {
   const docNumber = (req.params.docNumber || '').trim();
   if (!docNumber) {
     return res.status(400).json({ error: 'Missing document number' });
   }
 
   try {
-    const header = db.prepare(`
+    const db = await getDb();
+    const header = await db.get(`
       SELECT internal_id, transaction_date, entity_name, document_number, status
       FROM purchase_orders
       WHERE document_number = ?
       ORDER BY transaction_date DESC
       LIMIT 1
-    `).get(docNumber);
+    `, docNumber);
 
     if (!header) {
       return res.status(404).json({ error: 'Document not found' });
     }
 
-    const lines = db.prepare(`
+    const lines = await db.all(`
       SELECT item_name AS item, quantity, amount
       FROM purchase_orders
       WHERE document_number = ? AND item_name IS NOT NULL AND item_name != ''
       ORDER BY rowid ASC
-    `).all(docNumber);
+    `, docNumber);
 
-    const totals = db.prepare(`
+    const totals = await db.get(`
       SELECT 
         SUM(COALESCE(quantity,0)) AS total_qty,
         SUM(COALESCE(amount,0))   AS total_amount
       FROM purchase_orders
       WHERE document_number = ?
         AND item_name IS NOT NULL AND item_name != ''
-    `).get(docNumber);
+    `, docNumber);
 
     res.json({ header, lines, totals });
   } catch (e) {
