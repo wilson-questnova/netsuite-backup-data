@@ -1,7 +1,8 @@
 import express from 'express';
 import cors from 'cors';
+import fs from 'fs';
 import path from 'path';
-import { getDb } from './db';
+import { getDb, dbFilePath } from './db';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -35,6 +36,41 @@ app.use('/api', basicAuth);
 
 app.get('/api/auth/me', (req, res) => {
   res.json({ user: BASIC_USER });
+});
+
+app.get('/api/health', async (req, res) => {
+  try {
+    const db = await getDb();
+    const fileExists = fs.existsSync(dbFilePath);
+    const tablesRaw = await db.all(
+      "SELECT name FROM sqlite_master WHERE type = 'table' ORDER BY name ASC"
+    ) as { name: string }[];
+
+    let purchaseOrdersCount: number | null = null;
+    let purchaseOrdersCountError: string | null = null;
+    try {
+      const row = await db.get('SELECT COUNT(*) as count FROM purchase_orders') as { count: number };
+      purchaseOrdersCount = row?.count ?? 0;
+    } catch (e) {
+      purchaseOrdersCountError = e instanceof Error ? e.message : String(e);
+    }
+
+    res.json({
+      ok: true,
+      dbFilePath,
+      fileExists,
+      tables: tablesRaw.map((t) => t.name),
+      purchaseOrdersCount,
+      purchaseOrdersCountError,
+    });
+  } catch (e) {
+    res.status(500).json({
+      ok: false,
+      error: e instanceof Error ? e.message : String(e),
+      dbFilePath,
+      fileExists: fs.existsSync(dbFilePath),
+    });
+  }
 });
 
 // API Routes
