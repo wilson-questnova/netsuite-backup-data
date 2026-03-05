@@ -236,6 +236,18 @@ function App() {
     }
   };
 
+  useEffect(() => {
+    if (!detailOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setDetailOpen(false);
+        setDetail(null);
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [detailOpen]);
+
   return (
     <div className="min-h-screen bg-gray-50 p-8">
       <div className="max-w-7xl mx-auto space-y-6">
@@ -422,15 +434,21 @@ function App() {
         </div>
       </div>
       {detailOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-          <div className="bg-white w-full max-w-3xl rounded-lg shadow-lg overflow-hidden">
-            <div className="flex items-center justify-between border-b px-6 py-4">
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
+          onClick={() => { setDetailOpen(false); setDetail(null); }}
+        >
+          <div
+            className="bg-white w-full max-w-3xl rounded-lg shadow-lg overflow-hidden max-h-[80vh] flex flex-col"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between border-b px-6 py-4 shrink-0">
               <h2 className="text-lg font-semibold text-gray-900">Purchase Order Details</h2>
               <button className="text-gray-500 hover:text-gray-700" onClick={() => { setDetailOpen(false); setDetail(null); }}>
                 Close
               </button>
             </div>
-            <div className="p-6">
+            <div className="p-6 overflow-y-auto">
               {detailLoading ? (
                 <div className="flex items-center justify-center py-8 text-gray-500">
                   <Loader2 className="h-6 w-6 animate-spin mr-2" /> Loading...
