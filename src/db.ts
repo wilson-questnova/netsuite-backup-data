@@ -1,6 +1,7 @@
 import sqlite3 from 'sqlite3';
 import { open, Database } from 'sqlite';
 import path from 'path';
+import fs from 'fs';
 
 const dbPath = path.resolve(__dirname, '../data/netsuite.db');
 
@@ -8,6 +9,7 @@ let dbInstance: Database | null = null;
 
 export async function getDb() {
   if (dbInstance) return dbInstance;
+  await fs.promises.mkdir(path.dirname(dbPath), { recursive: true });
   
   dbInstance = await open({
     filename: dbPath,
