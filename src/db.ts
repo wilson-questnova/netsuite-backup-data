@@ -1,12 +1,27 @@
-import Database from 'better-sqlite3';
+import sqlite3 from 'sqlite3';
+import { open, Database } from 'sqlite';
 import path from 'path';
 
 const dbPath = path.resolve(__dirname, '../data/netsuite.db');
-const db = new Database(dbPath);
 
-export function initDb() {
+let dbInstance: Database | null = null;
+
+export async function getDb() {
+  if (dbInstance) return dbInstance;
+  
+  dbInstance = await open({
+    filename: dbPath,
+    driver: sqlite3.Database
+  });
+  
   // Enable WAL mode for better concurrency
-  db.pragma('journal_mode = WAL');
+  await dbInstance.exec('PRAGMA journal_mode = WAL');
+  
+  return dbInstance;
+}
+
+export async function initDb() {
+  const db = await getDb();
 
   // Create the main records table
   // We use a generic schema but index key fields for performance
@@ -31,13 +46,11 @@ export function initDb() {
     CREATE INDEX IF NOT EXISTS idx_po_date ON purchase_orders(transaction_date);
   `;
 
-  db.exec(schema);
+  await db.exec(schema);
   console.log('Database initialized at:', dbPath);
 }
 
-export const getDb = () => db;
-
 // Run init if called directly
 if (require.main === module) {
-  initDb();
+  initDb().catch(console.error);
 }
