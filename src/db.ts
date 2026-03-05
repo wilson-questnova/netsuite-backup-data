@@ -4,29 +4,11 @@ import path from 'path';
 import fs from 'fs';
 
 const dbPath = path.resolve(__dirname, '../data/netsuite.db');
+export const dbFilePath = dbPath;
 
 let dbInstance: Database | null = null;
 
-export async function getDb() {
-  if (dbInstance) return dbInstance;
-  await fs.promises.mkdir(path.dirname(dbPath), { recursive: true });
-  
-  dbInstance = await open({
-    filename: dbPath,
-    driver: sqlite3.Database
-  });
-  
-  // Enable WAL mode for better concurrency
-  await dbInstance.exec('PRAGMA journal_mode = WAL');
-  
-  return dbInstance;
-}
-
-export async function initDb() {
-  const db = await getDb();
-
-  // Create the main records table
-  // We use a generic schema but index key fields for performance
+async function ensureSchema(db: Database) {
   const schema = `
     CREATE TABLE IF NOT EXISTS purchase_orders (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -49,6 +31,44 @@ export async function initDb() {
   `;
 
   await db.exec(schema);
+}
+
+export async function getDb() {
+  if (dbInstance) return dbInstance;
+  await fs.promises.mkdir(path.dirname(dbPath), { recursive: true });
+  
+  const openDb = (mode: number) =>
+    open({
+      filename: dbPath,
+      driver: sqlite3.Database,
+      mode,
+    });
+  
+  try {
+    dbInstance = await openDb(sqlite3.OPEN_READWRITE | sqlite3.OPEN_CREATE);
+  } catch (e) {
+    dbInstance = await openDb(sqlite3.OPEN_READONLY);
+  }
+
+  try {
+    await dbInstance.exec('PRAGMA journal_mode = WAL');
+  } catch (_) {
+    // ignore
+  }
+
+  try {
+    await ensureSchema(dbInstance);
+  } catch (_) {
+    // ignore (e.g. readonly database)
+  }
+  
+  return dbInstance;
+}
+
+export async function initDb() {
+  const db = await getDb();
+
+  await ensureSchema(db);
   console.log('Database initialized at:', dbPath);
 }
 
