@@ -9,6 +9,8 @@
     "etl:po:prod": "node dist/process_po.js",
     "etl:vp": "ts-node src/process_vendor_payments.ts",
     "etl:vp:prod": "node dist/process_vendor_payments.js",
+    "etl:inv": "ts-node src/process_invoices.ts",
+    "etl:inv:prod": "node dist/process_invoices.js",
     "init:db": "ts-node src/db.ts",
     "db:export": "ts-node src/export_db.ts",
     "test": "echo \"Error: no test specified\" && exit 1",
@@ -26,10 +28,14 @@
     "@types/node": "^25.3.3",
     "cors": "^2.8.6",
     "express": "^5.2.1",
+    "sax": "^1.6.0",
     "sqlite": "^5.1.1",
     "sqlite3": "^5.1.7",
     "ts-node": "^10.9.2",
     "typescript": "^5.9.3",
     "xlsx": "^0.18.5"
+  },
+  "devDependencies": {
+    "@types/sax": "^1.2.7"
   }
 }
