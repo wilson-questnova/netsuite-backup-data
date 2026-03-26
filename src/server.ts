@@ -86,13 +86,19 @@ app.get('/api/purchase-orders', async (req, res) => {
     const offset = (page - 1) * limit;
 
     let query = `
-      SELECT internal_id, transaction_date, entity_name, document_number, 
-             status, item_name, quantity, amount 
+      SELECT 
+        MAX(internal_id) as internal_id, 
+        MAX(transaction_date) as transaction_date, 
+        MAX(entity_name) as entity_name, 
+        document_number, 
+        MAX(status) as status, 
+        SUM(CASE WHEN item_name IS NOT NULL AND item_name != '' THEN quantity ELSE 0 END) as quantity, 
+        SUM(CASE WHEN item_name IS NOT NULL AND item_name != '' THEN amount ELSE 0 END) as amount 
       FROM purchase_orders
       WHERE 1=1
     `;
     
-    let countQuery = `SELECT COUNT(*) as total FROM purchase_orders WHERE 1=1`;
+    let countQuery = `SELECT COUNT(DISTINCT document_number) as total FROM purchase_orders WHERE 1=1`;
     const params: any[] = [];
 
     if (search) {
@@ -131,8 +137,8 @@ app.get('/api/purchase-orders', async (req, res) => {
       params.push(status);
     }
 
-    // Order by date desc
-    query += ` ORDER BY transaction_date DESC LIMIT ? OFFSET ?`;
+    // Group by document number and order
+    query += ` GROUP BY document_number ORDER BY MAX(transaction_date) DESC LIMIT ? OFFSET ?`;
     
     // For main query, we need limit/offset params
     const queryParams = [...params, limit, offset];
@@ -276,13 +282,19 @@ app.get('/api/vendor-payments', async (req, res) => {
     const offset = (page - 1) * limit;
 
     let query = `
-      SELECT internal_id, transaction_date, entity_name, document_number, 
-             status, item_name, quantity, amount 
+      SELECT 
+        MAX(internal_id) as internal_id, 
+        MAX(transaction_date) as transaction_date, 
+        MAX(entity_name) as entity_name, 
+        document_number, 
+        MAX(status) as status, 
+        SUM(CASE WHEN item_name IS NOT NULL AND item_name != '' THEN quantity ELSE 0 END) as quantity, 
+        SUM(CASE WHEN item_name IS NOT NULL AND item_name != '' THEN amount ELSE 0 END) as amount 
       FROM vendor_payments
       WHERE 1=1
     `;
     
-    let countQuery = `SELECT COUNT(*) as total FROM vendor_payments WHERE 1=1`;
+    let countQuery = `SELECT COUNT(DISTINCT document_number) as total FROM vendor_payments WHERE 1=1`;
     const params: any[] = [];
 
     if (search) {
@@ -321,7 +333,7 @@ app.get('/api/vendor-payments', async (req, res) => {
       params.push(status);
     }
 
-    query += ` ORDER BY transaction_date DESC LIMIT ? OFFSET ?`;
+    query += ` GROUP BY document_number ORDER BY MAX(transaction_date) DESC LIMIT ? OFFSET ?`;
     const queryParams = [...params, limit, offset];
 
     const totalResult = await db.get(countQuery, ...params) as { total: number };
@@ -442,7 +454,7 @@ app.get('/api/vendor-payments/:docNumber', async (req, res) => {
         SUM(COALESCE(quantity,0)) AS total_qty,
         SUM(COALESCE(amount,0))   AS total_amount
       FROM vendor_payments
-      WHERE document_number = ?
+      WHERE document_number = ? AND item_name IS NOT NULL AND item_name != ''
     `, docNumber);
 
     res.json({ header, lines, totals });
