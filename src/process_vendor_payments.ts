@@ -19,9 +19,12 @@ function parseExcelDate(val: any): string | null {
 function toNumber(v: any): number {
   if (v === null || v === undefined) return 0;
   if (typeof v === 'number') return isFinite(v) ? v : 0;
-  const s = String(v).replace(/[₱,\s]/g, '');
+  let s = String(v).trim();
+  const isParenNegative = /^\(.*\)$/.test(s);
+  s = s.replace(/[₱,\s]/g, '').replace(/\(/g, '').replace(/\)/g, '');
   const n = parseFloat(s);
-  return isFinite(n) ? n : 0;
+  if (!isFinite(n)) return 0;
+  return isParenNegative ? -n : n;
 }
 
 async function run() {
@@ -61,9 +64,9 @@ async function run() {
           lastId = currentId;
           context = {
             id: currentId,
-            vendor: row['Vendor Name'] ?? row['Payee'] ?? row['Supplier Name'] ?? row['Entity'] ?? null,
-            date: row['Date'] ?? row['Transaction Date'] ?? null,
-            doc: row['Document Number'] ?? row['Payment Number'] ?? row['Number'] ?? null,
+            vendor: row['Vendor Name'] ?? row['Main Line Name'] ?? row['Payee'] ?? row['Supplier Name'] ?? row['Entity'] ?? null,
+            date: row['Date'] ?? row['Transaction Date'] ?? row['Date Processed'] ?? null,
+            doc: row['Document Number'] ?? row['Transaction Number'] ?? row['Payment Number'] ?? row['Number'] ?? null,
             status: row['Status'] ?? row['Document Status'] ?? null,
           };
         }
@@ -71,9 +74,9 @@ async function run() {
         const complete = {
           ...row,
           'Internal ID': context.id ?? row['Internal ID'],
-          'Vendor Name': context.vendor ?? row['Vendor Name'],
-          'Date': context.date ?? row['Date'],
-          'Document Number': context.doc ?? row['Document Number'],
+          'Vendor Name': context.vendor ?? row['Vendor Name'] ?? row['Main Line Name'],
+          'Date': context.date ?? row['Date'] ?? row['Transaction Date'] ?? row['Date Processed'],
+          'Document Number': context.doc ?? row['Document Number'] ?? row['Transaction Number'],
           'Status': context.status ?? row['Status'],
         };
 
@@ -81,12 +84,20 @@ async function run() {
         if (!internalId) continue;
 
         const date = parseExcelDate(complete['Date']);
-        const vendor = complete['Vendor Name'] ?? complete['Payee'] ?? complete['Supplier Name'] ?? complete['Entity'] ?? null;
-        const docNum = complete['Document Number'] ?? complete['Payment Number'] ?? complete['Number'] ?? null;
+        const vendor = complete['Vendor Name'] ?? complete['Main Line Name'] ?? complete['Payee'] ?? complete['Supplier Name'] ?? complete['Entity'] ?? null;
+        const docNum = complete['Document Number'] ?? complete['Transaction Number'] ?? complete['Payment Number'] ?? complete['Number'] ?? null;
         const status = complete['Status'] ?? null;
         const lineName =
-          complete['Applied To'] ?? complete['Memo'] ?? complete['Account'] ?? complete['Line'] ?? null;
-        const qty = toNumber(complete['Quantity'] ?? 0);
+          complete['Applied To'] ??
+          complete['Applied To Transaction'] ??
+          complete['Applied To Transact'] ??
+          complete['Memo'] ??
+          complete['Memo (Main)'] ??
+          complete['Account'] ??
+          complete['Account (Main)'] ??
+          complete['Line'] ??
+          null;
+        const qty = toNumber(complete['Quantity'] ?? 0); // most VP rows have no quantity; remains 0
         const amount = toNumber(complete['Amount'] ?? complete['Payment Amount'] ?? complete['Applied Amount'] ?? 0);
 
         await stmt.run(
@@ -115,4 +126,3 @@ async function run() {
 }
 
 run().catch(console.error);
-

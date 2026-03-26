@@ -223,9 +223,12 @@ app.get('/api/purchase-orders/:docNumber', async (req, res) => {
     const parseNumber = (v: any): number => {
       if (v === null || v === undefined) return 0;
       if (typeof v === 'number') return isFinite(v) ? v : 0;
-      const s = String(v).replace(/[₱,\s]/g, '');
+      let s = String(v).trim();
+      const isParenNegative = /^\(.*\)$/.test(s);
+      s = s.replace(/[₱,\s]/g, '').replace(/\(/g, '').replace(/\)/g, '');
       const n = parseFloat(s);
-      return isFinite(n) ? n : 0;
+      if (!isFinite(n)) return 0;
+      return isParenNegative ? -n : n;
     };
 
     const lines = rows.map(r => {
@@ -412,7 +415,16 @@ app.get('/api/vendor-payments/:docNumber', async (req, res) => {
     const lines = rows.map(r => {
       let raw: any = null;
       try { raw = r.raw_data ? JSON.parse(r.raw_data) : null; } catch { raw = null; }
-      const item = r.item ?? raw?.['Applied To'] ?? raw?.['Memo'] ?? raw?.['Account'] ?? '';
+      const item =
+        r.item ??
+        raw?.['Applied To'] ??
+        raw?.['Applied To Transaction'] ??
+        raw?.['Applied To Transact'] ??
+        raw?.['Memo'] ??
+        raw?.['Memo (Main)'] ??
+        raw?.['Account'] ??
+        raw?.['Account (Main)'] ??
+        '';
       const rate = raw ? (raw['Item Rate'] ?? raw['Rate'] ?? null) : null;
       const discount = raw ? (raw['Discount'] ?? raw['Item Discount'] ?? null) : null;
       return {
