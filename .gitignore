@@ -9,3 +9,5 @@ dist
 client/node_modules
 client/dist
 .env
+files/
+data/
