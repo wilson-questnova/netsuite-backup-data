@@ -34,7 +34,7 @@ function App() {
   const [status, setStatus] = useState('');
   const [statuses, setStatuses] = useState<string[]>([]);
   const [page, setPage] = useState(1);
-  const [recordType, setRecordType] = useState<'PO' | 'VP' | 'INV'>('PO');
+  const [recordType, setRecordType] = useState<'PO' | 'VP' | 'INV' | 'IR'>('PO');
   const [detailOpen, setDetailOpen] = useState(false);
   const [detailLoading, setDetailLoading] = useState(false);
   const [detail, setDetail] = useState<null | {
@@ -127,6 +127,7 @@ function App() {
       let path = '/api/purchase-orders';
       if (recordType === 'VP') path = '/api/vendor-payments';
       if (recordType === 'INV') path = '/api/invoices';
+      if (recordType === 'IR') path = '/api/item-receipts';
       
       const response = await api.get(path, {
         headers: authHeader ? { Authorization: authHeader } : undefined,
@@ -174,6 +175,7 @@ function App() {
     let statusesPath = '/api/purchase-orders-statuses';
     if (recordType === 'VP') statusesPath = '/api/vendor-payments-statuses';
     if (recordType === 'INV') statusesPath = '/api/invoices-statuses';
+    if (recordType === 'IR') statusesPath = '/api/item-receipts-statuses';
     
     api
       .get(statusesPath, {
@@ -249,6 +251,7 @@ function App() {
       let detailPath = `/api/purchase-orders/${encodeURIComponent(docNumber)}`;
       if (recordType === 'VP') detailPath = `/api/vendor-payments/${encodeURIComponent(docNumber)}`;
       if (recordType === 'INV') detailPath = `/api/invoices/${encodeURIComponent(docNumber)}`;
+      if (recordType === 'IR') detailPath = `/api/item-receipts/${encodeURIComponent(docNumber)}`;
       
       const res = await api.get(detailPath, {
         headers: authHeader ? { Authorization: authHeader } : undefined,
@@ -268,7 +271,7 @@ function App() {
         {/* Header */}
         <div className="flex justify-between items-center">
           <h1 className="text-3xl font-bold text-gray-900">
-            {recordType === 'PO' ? 'Purchase Orders Viewer' : recordType === 'VP' ? 'Vendor Payments Viewer' : 'Invoices Viewer'}
+            {recordType === 'PO' ? 'Purchase Orders Viewer' : recordType === 'VP' ? 'Vendor Payments Viewer' : recordType === 'INV' ? 'Invoices Viewer' : 'Item Receipts Viewer'}
           </h1>
           <div className="flex items-center space-x-4">
             <div className="text-sm text-gray-500">
@@ -296,6 +299,7 @@ function App() {
               <option value="PO">Purchase Orders</option>
               <option value="VP">Vendor Payments</option>
               <option value="INV">Invoices</option>
+              <option value="IR">Item Receipts</option>
             </select>
           </div>
           <div className="relative flex-1">
@@ -358,8 +362,8 @@ function App() {
                 <tr>
                   <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
                   <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Doc Num</th>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{recordType === 'PO' ? 'Supplier' : recordType === 'VP' ? 'Vendor' : 'Customer'}</th>
-                  {(recordType === 'PO' || recordType === 'INV') && (
+                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{recordType === 'PO' || recordType === 'IR' ? 'Supplier' : recordType === 'VP' ? 'Vendor' : 'Customer'}</th>
+                  {(recordType === 'PO' || recordType === 'INV' || recordType === 'IR') && (
                     <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Qty</th>
                   )}
                   <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Amount</th>
@@ -395,7 +399,7 @@ function App() {
                         </button>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 max-w-[200px] truncate" title={row.entity_name}>{row.entity_name}</td>
-                      {(recordType === 'PO' || recordType === 'INV') && (
+                      {(recordType === 'PO' || recordType === 'INV' || recordType === 'IR') && (
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-right">{row.quantity}</td>
                       )}
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right font-mono">
@@ -473,8 +477,8 @@ function App() {
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between border-b px-6 py-4 shrink-0">
-              <h2 className="text-lg font-semibold text-gray-900">{recordType === 'PO' ? 'Purchase Order Details' : recordType === 'VP' ? 'Vendor Payment Details' : 'Invoice Details'}</h2>
-              <button className="text-gray-500 hover:text-gray-700" onClick={() => { setDetailOpen(false); setDetail(null); }}>
+                <h2 className="text-lg font-semibold text-gray-900">{recordType === 'PO' ? 'Purchase Order Details' : recordType === 'VP' ? 'Vendor Payment Details' : recordType === 'INV' ? 'Invoice Details' : 'Item Receipt Details'}</h2>
+                <button className="text-gray-500 hover:text-gray-700" onClick={() => { setDetailOpen(false); setDetail(null); }}>
                 Close
               </button>
             </div>
@@ -485,10 +489,10 @@ function App() {
                 </div>
               ) : detail ? (
                 <>
-                  <div className="grid grid-cols-2 gap-4 mb-4 text-sm">
+                  <div className="grid grid-cols-2 gap-y-4 gap-x-8 mb-6 bg-gray-50 p-4 rounded-lg">
                     <div><span className="text-gray-500">Doc Num:</span> <span className="font-medium">{detail.header.document_number}</span></div>
                     <div><span className="text-gray-500">Date:</span> <span className="font-medium">{detail.header.transaction_date}</span></div>
-                    <div><span className="text-gray-500">{recordType === 'PO' ? 'Supplier:' : recordType === 'VP' ? 'Vendor:' : 'Customer:'}</span> <span className="font-medium">{detail.header.entity_name}</span></div>
+                    <div><span className="text-gray-500">{recordType === 'PO' || recordType === 'IR' ? 'Supplier:' : recordType === 'VP' ? 'Vendor:' : 'Customer:'}</span> <span className="font-medium">{detail.header.entity_name}</span></div>
                     <div><span className="text-gray-500">Status:</span> <span className="font-medium">{detail.header.status}</span></div>
                     {detail.header.location ? (
                       <div className="col-span-2"><span className="text-gray-500">Location:</span> <span className="font-medium">{detail.header.location}</span></div>

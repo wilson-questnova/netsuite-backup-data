@@ -11,6 +11,8 @@
     "etl:vp:prod": "node dist/process_vendor_payments.js",
     "etl:inv": "ts-node src/process_invoices.ts",
     "etl:inv:prod": "node dist/process_invoices.js",
+    "etl:ir": "ts-node src/process_item_receipts.ts",
+    "etl:ir:prod": "node dist/process_item_receipts.js",
     "init:db": "ts-node src/db.ts",
     "db:export": "ts-node src/export_db.ts",
     "test": "echo \"Error: no test specified\" && exit 1",
