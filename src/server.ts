@@ -204,7 +204,7 @@ app.get('/api/purchase-orders/:docNumber', async (req, res) => {
       rawHeader?.['Location Name'] ??
       null;
 
-    const header = headerRow
+    let header: any = headerRow
       ? {
           internal_id: headerRow.internal_id,
           transaction_date: headerRow.transaction_date,
@@ -212,6 +212,12 @@ app.get('/api/purchase-orders/:docNumber', async (req, res) => {
           document_number: headerRow.document_number,
           status: headerRow.status,
           location,
+          supplier_reference_no:
+            rawHeader?.['Supplier Reference No.'] ??
+            rawHeader?.['Supplier Reference No'] ??
+            rawHeader?.['Supplier Ref No.'] ??
+            rawHeader?.['Supplier Ref No'] ??
+            null,
         }
       : null;
 
@@ -809,6 +815,25 @@ app.get('/api/item-receipts/:docNumber', async (req, res) => {
       const n = parseFloat(s);
       return isFinite(n) ? n : 0;
     };
+
+    // Fallback extraction for supplier reference number if header did not contain it
+    if (header && !(header as any).supplier_reference_no) {
+      for (const r of rows) {
+        try {
+          const raw = r.raw_data ? JSON.parse(r.raw_data) : null;
+          const supRef =
+            raw?.['Supplier Reference No.'] ??
+            raw?.['Supplier Reference No'] ??
+            raw?.['Supplier Ref No.'] ??
+            raw?.['Supplier Ref No'] ??
+            null;
+          if (supRef) {
+            (header as any).supplier_reference_no = supRef;
+            break;
+          }
+        } catch {}
+      }
+    }
 
     const lines = rows.map(r => {
       let raw: any = null;

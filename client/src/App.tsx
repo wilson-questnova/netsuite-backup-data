@@ -38,7 +38,7 @@ function App() {
   const [detailOpen, setDetailOpen] = useState(false);
   const [detailLoading, setDetailLoading] = useState(false);
   const [detail, setDetail] = useState<null | {
-    header: { internal_id: string; transaction_date: string; entity_name: string; document_number: string; status: string; location?: string | null };
+    header: { internal_id: string; transaction_date: string; entity_name: string; document_number: string; status: string; location?: string | null; supplier_reference_no?: string | null };
     lines: { item: string; quantity: number; rate?: number; srp?: number; discount?: string; amount: number }[];
     totals: { total_qty: number; total_amount: number };
   }>(null);
@@ -309,7 +309,13 @@ function App() {
             <input
               type="text"
               className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md leading-5 bg-white placeholder-gray-500 focus:outline-none focus:placeholder-gray-400 focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-              placeholder={recordType === 'PO' ? 'Search by Document Number, Supplier, or Item...' : 'Search by Document Number, Vendor, or Item...'}
+              placeholder={
+                recordType === 'PO'
+                  ? 'Search by Document Number, Supplier, or Item...'
+                  : recordType === 'IR'
+                  ? 'Search by Document Number, Company, or Item...'
+                  : 'Search by Document Number, Vendor/Customer, or Item...'
+              }
               value={search}
               onChange={(e) => setSearch(e.target.value)}
             />
@@ -362,7 +368,7 @@ function App() {
                 <tr>
                   <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
                   <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Doc Num</th>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{recordType === 'PO' || recordType === 'IR' ? 'Supplier' : recordType === 'VP' ? 'Vendor' : 'Customer'}</th>
+                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{recordType === 'PO' ? 'Supplier' : recordType === 'IR' ? 'Company' : recordType === 'VP' ? 'Vendor' : 'Customer'}</th>
                   {(recordType === 'PO' || recordType === 'INV' || recordType === 'IR') && (
                     <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Qty</th>
                   )}
@@ -492,7 +498,19 @@ function App() {
                   <div className="grid grid-cols-2 gap-y-4 gap-x-8 mb-6 bg-gray-50 p-4 rounded-lg">
                     <div><span className="text-gray-500">Doc Num:</span> <span className="font-medium">{detail.header.document_number}</span></div>
                     <div><span className="text-gray-500">Date:</span> <span className="font-medium">{detail.header.transaction_date}</span></div>
-                    <div><span className="text-gray-500">{recordType === 'PO' || recordType === 'IR' ? 'Supplier:' : recordType === 'VP' ? 'Vendor:' : 'Customer:'}</span> <span className="font-medium">{detail.header.entity_name}</span></div>
+                    {recordType === 'IR' ? (
+                      <>
+                        <div><span className="text-gray-500">Supplier:</span> <span className="font-medium">{detail.header.entity_name}</span></div>
+                        <div><span className="text-gray-500">Supplier Ref No.:</span> <span className="font-medium">{detail.header.supplier_reference_no || ''}</span></div>
+                      </>
+                    ) : (
+                      <div>
+                        <span className="text-gray-500">
+                          {recordType === 'PO' ? 'Supplier:' : recordType === 'VP' ? 'Vendor:' : 'Customer:'}
+                        </span>
+                        <span className="font-medium">{detail.header.entity_name}</span>
+                      </div>
+                    )}
                     <div><span className="text-gray-500">Status:</span> <span className="font-medium">{detail.header.status}</span></div>
                     {detail.header.location ? (
                       <div className="col-span-2"><span className="text-gray-500">Location:</span> <span className="font-medium">{detail.header.location}</span></div>
