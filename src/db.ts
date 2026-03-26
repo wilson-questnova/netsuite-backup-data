@@ -107,6 +107,25 @@ async function ensureSchema(db: Database) {
     CREATE INDEX IF NOT EXISTS idx_vb_entity_name ON vendor_bills(entity_name);
     CREATE INDEX IF NOT EXISTS idx_vb_document_number ON vendor_bills(document_number);
     CREATE INDEX IF NOT EXISTS idx_vb_date ON vendor_bills(transaction_date);
+
+    CREATE TABLE IF NOT EXISTS sales_orders (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      internal_id TEXT,
+      transaction_date TEXT,
+      entity_name TEXT,
+      document_number TEXT,
+      status TEXT,
+      item_name TEXT,
+      quantity REAL,
+      amount REAL,
+      raw_data JSON,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_so_internal_id ON sales_orders(internal_id);
+    CREATE INDEX IF NOT EXISTS idx_so_entity_name ON sales_orders(entity_name);
+    CREATE INDEX IF NOT EXISTS idx_so_document_number ON sales_orders(document_number);
+    CREATE INDEX IF NOT EXISTS idx_so_date ON sales_orders(transaction_date);
   `;
 
   await db.exec(schema);
