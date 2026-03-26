@@ -400,7 +400,7 @@ app.get('/api/vendor-payments/:docNumber', async (req, res) => {
     const rows = await db.all(`
       SELECT item_name AS item, quantity, amount, raw_data
       FROM vendor_payments
-      WHERE document_number = ? AND (item_name IS NOT NULL AND item_name != '' OR raw_data IS NOT NULL)
+      WHERE document_number = ? AND item_name IS NOT NULL AND item_name != ''
       ORDER BY rowid ASC
     `, docNumber) as any[];
 
